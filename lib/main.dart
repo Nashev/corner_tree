@@ -26,9 +26,9 @@ class CornerTreePage extends StatefulWidget {
 }
 
 class CornerTreePageState extends State<CornerTreePage> {
-  double _length = 5.5; // meters
-  double _height = 1.5; // meters
-  int _hooks = 14; // количество крючков
+  double _height = 1.5; // meters (высота конуса)
+  double _baseWidth = 1.2; // meters (ширина основания конуса)
+  int _hooks = 15; // количество крючков (включая верхний)
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +53,7 @@ class CornerTreePageState extends State<CornerTreePage> {
                           border: Border.all(color: Colors.grey.shade300),
                         ),
                         child: CustomPaint(
-                          painter: CornerTreePainter(L: _length, H: _height, hooks: _hooks),
+                          painter: CornerTreePainter(H: _height, baseWidth: _baseWidth, hooks: _hooks),
                         ),
                       );
                     },
@@ -63,24 +63,24 @@ class CornerTreePageState extends State<CornerTreePage> {
 
               // Controls
               const SizedBox(height: 10),
-              _buildNumberRow('Длина гирлянды L (м)', _length.toStringAsFixed(1)),
-              Slider(
-                min: 1.0,
-                max: 20.0,
-                divisions: 190,
-                value: _length,
-                label: '${_length.toStringAsFixed(2)} m',
-                onChanged: (v) => setState(() => _length = double.parse(v.toStringAsFixed(2))),
-              ),
-
-              _buildNumberRow('Высота H (м)', _height.toStringAsFixed(2)),
+              _buildNumberRow('Высота конуса H (м)', _height.toStringAsFixed(2)),
               Slider(
                 min: 0.3,
                 max: 3.0,
                 divisions: 270,
                 value: _height,
-                label: '${_height.toStringAsFixed(2)} m',
+                label: '${_height.toStringAsFixed(2)} м',
                 onChanged: (v) => setState(() => _height = double.parse(v.toStringAsFixed(2))),
+              ),
+
+              _buildNumberRow('Ширина основания (м)', _baseWidth.toStringAsFixed(2)),
+              Slider(
+                min: 0.2,
+                max: 3.0,
+                divisions: 280,
+                value: _baseWidth,
+                label: '${_baseWidth.toStringAsFixed(2)} м',
+                onChanged: (v) => setState(() => _baseWidth = double.parse(v.toStringAsFixed(2))),
               ),
 
               _buildNumberRow('Число крючков (hooks)', '$_hooks'),
@@ -97,17 +97,21 @@ class CornerTreePageState extends State<CornerTreePage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Конус расширяется от вершины книзу'),
+                  Expanded(
+                    child: Text(
+                      'Длина гирлянды рассчитывается автоматически',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  ),
                   TextButton(
                     onPressed: () {
                       setState(() {
-                        // quick example preset
-                        _length = 5.5;
                         _height = 1.5;
-                        _hooks = 14;
+                        _baseWidth = 1.2;
+                        _hooks = 15;
                       });
                     },
-                    child: const Text('Сбросить в пример'),
+                    child: const Text('Сбросить'),
                   ),
                 ],
               ),
@@ -131,11 +135,11 @@ class CornerTreePageState extends State<CornerTreePage> {
 }
 
 class CornerTreePainter extends CustomPainter {
-  final double L; // meters (длина гирлянды)
   final double H; // meters (высота конуса)
-  final int hooks; // количество крючков
+  final double baseWidth; // meters (ширина основания конуса)
+  final int hooks; // количество крючков (включая верхний)
 
-  CornerTreePainter({required this.L, required this.H, required this.hooks});
+  CornerTreePainter({required this.H, required this.baseWidth, required this.hooks});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -153,29 +157,24 @@ class CornerTreePainter extends CustomPainter {
     final paintText = TextPainter(textDirection: TextDirection.ltr);
 
     // Конусная геометрия: вершина вверху, расширение книзу
-    // hooks - общее количество крючков (не считая вершину)
-    final int segments = hooks; // количество сегментов гирлянды
-    final double h = H / segments; // вертикальный шаг на один сегмент (м)
-    final double s = L / segments; // длина одного сегмента гирлянды (м)
+    // hooks - общее количество крючков (включая верхний в вершине)
+    // segments - количество сегментов гирлянды между крючками
+    final int segments = hooks - 1; // сегментов на 1 меньше, чем крючков
 
-    // Радиус конуса в основании (максимальный)
-    // Используем формулу: если общая длина L распределена по конусу,
-    // то нужно рассчитать максимальный радиус основания
-    // Упрощённо: радиус растёт линейно от 0 до rMax
-    double rMax = 0.0;
-    bool impossible = false;
-
-    // Проверка: можно ли разместить гирлянду с такими параметрами
-    if (s <= h) {
-      impossible = true;
-    } else {
-      // Для конуса радиус растёт пропорционально высоте
-      // r(y) = rMax * (y / H), где y - текущая высота
-      // Каждый сегмент имеет горизонтальную проекцию d_i
-      // d_i^2 = s^2 - h^2, но для конуса d растёт
-      // Упрощаем: используем средний радиус для оценки
-      rMax = sqrt(max(0.0, s * s - h * h)) * segments / 4;
+    if (segments < 1) {
+      paintText.text = TextSpan(
+        text: 'Требуется минимум 2 крючка',
+        style: TextStyle(color: Colors.red.shade700, fontSize: 12, fontWeight: FontWeight.w500),
+      );
+      paintText.layout(maxWidth: size.width - 20);
+      paintText.paint(canvas, Offset(10, size.height / 2 - 10));
+      return;
     }
+
+    final double h = H / segments; // вертикальный шаг на один сегмент (м)
+
+    // Радиус конуса в основании (задан пользователем)
+    final double rMax = baseWidth / 2; // радиус = половина ширины
 
     // Настройка визуализации
     final double padding = size.width * 0.08;
@@ -184,7 +183,7 @@ class CornerTreePainter extends CustomPainter {
     final double maxVisualHeight = size.height - padding * 2;
 
     // Масштаб: метры -> пиксели
-    final double widthInMeters = 2 * rMax;
+    final double widthInMeters = baseWidth;
     double scaleX = widthInMeters > 0 ? maxVisualWidth / (widthInMeters * 1.2) : maxVisualWidth / 1.0;
     double scaleY = H > 0 ? maxVisualHeight / (H * 1.1) : maxVisualHeight / 1.0;
     final double scale = min(scaleX, scaleY);
@@ -200,31 +199,31 @@ class CornerTreePainter extends CustomPainter {
     conePath.close();
     canvas.drawPath(conePath, paintCone);
 
-    // Если параметры несовместимы
-    if (impossible) {
-      paintText.text = TextSpan(
-        text: 'Параметры несовместимы: длина сегмента s ≤ h',
-        style: TextStyle(color: Colors.red.shade700, fontSize: 12),
-      );
-      paintText.layout(maxWidth: size.width - 20);
-      paintText.paint(canvas, Offset(10, size.height / 2 - 10));
-      return;
-    }
-
     // Строим крючки (hooks) с постепенным расширением
-    final List<Offset> points = [];
+    // Первый крючок - в вершине (0, 0)
+    final List<Offset> points = [topCenter]; // начинаем с вершины
     double accumulatedY = 0.0;
     bool toLeft = true;
 
+    // Рассчитываем длину гирлянды по факту
+    double totalGarlandLength = 0.0;
+
     for (int i = 0; i < segments; i++) {
       accumulatedY += h;
-      // Радиус на текущей высоте (линейное расширение)
+      // Радиус на текущей высоте (линейное расширение от 0 до rMax)
       final double currentRadius = rMax * (accumulatedY / H);
 
       // Горизонтальное смещение для текущего уровня
       final double xOffsetMeters = (toLeft ? -currentRadius : currentRadius);
       final Offset next = Offset(topCenter.dx + xOffsetMeters * scale, topCenter.dy + accumulatedY * scale);
       points.add(next);
+
+      // Вычисляем длину сегмента в метрах
+      final double dx =
+          xOffsetMeters - (points.length == 2 ? 0 : (toLeft ? currentRadius : -currentRadius) * (accumulatedY - h) / H);
+      final double segmentLength = sqrt(dx * dx + h * h);
+      totalGarlandLength += segmentLength;
+
       toLeft = !toLeft;
     }
 
@@ -235,9 +234,9 @@ class CornerTreePainter extends CustomPainter {
 
     // Рисуем гирлянду (зигзаг от вершины)
     final Path garlandPath = Path();
-    garlandPath.moveTo(topCenter.dx, topCenter.dy);
-    for (final p in points) {
-      garlandPath.lineTo(p.dx, p.dy);
+    garlandPath.moveTo(points[0].dx, points[0].dy);
+    for (int i = 1; i < points.length; i++) {
+      garlandPath.lineTo(points[i].dx, points[i].dy);
     }
     canvas.drawPath(garlandPath, paintLine);
 
@@ -256,16 +255,33 @@ class CornerTreePainter extends CustomPainter {
       canvas.drawLine(Offset(topCenter.dx - rPx, y), Offset(topCenter.dx + rPx, y), levelPaint);
     }
 
+    // Пересчитываем длину гирлянды более точно
+    totalGarlandLength = 0.0;
+    for (int i = 0; i < segments; i++) {
+      final double y1 = i * h;
+      final double y2 = (i + 1) * h;
+      final double r1 = rMax * (y1 / H);
+      final double r2 = rMax * (y2 / H);
+
+      // Горизонтальное расстояние: от одного края до другого (или от центра до края для первого)
+      final double horizontalDist = i == 0 ? r2 : (r1 + r2);
+      final double segmentLength = sqrt(horizontalDist * horizontalDist + h * h);
+      totalGarlandLength += segmentLength;
+    }
+
     // Выводим сводную информацию
-    final double baseWidth = 2 * rMax;
     final double coneAngle = atan(rMax / H) * 180 / pi;
+    final double avgSegmentLength = totalGarlandLength / segments;
     final summary =
-        'L=${L.toStringAsFixed(2)}м  H=${H.toStringAsFixed(2)}м  Hooks: $hooks\n'
-        'Основание конуса: ${baseWidth.toStringAsFixed(2)}м  '
-        'Угол: ${coneAngle.toStringAsFixed(1)}°';
+        'H=${H.toStringAsFixed(2)}м  '
+        'Основание=${baseWidth.toStringAsFixed(2)}м  '
+        'Hooks=$hooks (сегментов: $segments)\n'
+        'Длина гирлянды: ${totalGarlandLength.toStringAsFixed(2)}м  '
+        'Угол конуса: ${coneAngle.toStringAsFixed(1)}°  '
+        'Ср. сегмент: ${avgSegmentLength.toStringAsFixed(3)}м';
     paintText.text = TextSpan(
       text: summary,
-      style: TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w500),
+      style: TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w500),
     );
     paintText.layout(maxWidth: size.width - 20);
     paintText.paint(canvas, Offset(10, 6));
@@ -275,15 +291,15 @@ class CornerTreePainter extends CustomPainter {
       ..color = Colors.black38
       ..strokeWidth = 1;
     accumulatedY = 0.0;
-    for (int i = 0; i < segments; i++) {
-      accumulatedY += h;
+    for (int i = 0; i <= segments; i++) {
       final double y = topCenter.dy + accumulatedY * scale;
       canvas.drawLine(Offset(topCenter.dx - 5, y), Offset(topCenter.dx + 5, y), tickPaint);
+      if (i < segments) accumulatedY += h;
     }
   }
 
   @override
   bool shouldRepaint(covariant CornerTreePainter oldDelegate) {
-    return oldDelegate.L != L || oldDelegate.H != H || oldDelegate.hooks != hooks;
+    return oldDelegate.H != H || oldDelegate.baseWidth != baseWidth || oldDelegate.hooks != hooks;
   }
 }
