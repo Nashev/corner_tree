@@ -10,7 +10,7 @@ class CornerTreeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Corner Garland Designer',
+      title: 'Конусная ёлка с гирляндой',
       theme: ThemeData.light(),
       home: CornerTreePage(),
       debugShowCheckedModeBanner: false,
@@ -139,8 +139,9 @@ class CornerTreePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paintWall = Paint()
-      ..color = Colors.grey.shade400
+    final paintCone = Paint()
+      ..color = Colors.grey.shade300
+      ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     final paintLine = Paint()
       ..color = Colors.green.shade700
@@ -151,39 +152,57 @@ class CornerTreePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     final paintText = TextPainter(textDirection: TextDirection.ltr);
 
-    // compute geometry in meters (model)
-    final int diagonals = 2 * N;
-    final double h = H / diagonals; // vertical projection per diagonal (m)
-    final double s = L / diagonals; // length per diagonal (m)
-    double d = 0.0; // horizontal half-width per diagonal (m)
+    // Конусная геометрия: вершина вверху, расширение книзу
+    final int diagonals = 2 * N; // количество диагональных сегментов
+    final double h = H / diagonals; // вертикальный шаг на один сегмент (м)
+    final double s = L / diagonals; // длина одного сегмента гирлянды (м)
+
+    // Радиус конуса в основании (максимальный)
+    // Используем формулу: если общая длина L распределена по конусу,
+    // то нужно рассчитать максимальный радиус основания
+    // Упрощённо: радиус растёт линейно от 0 до rMax
+    double rMax = 0.0;
     bool impossible = false;
+
+    // Проверка: можно ли разместить гирлянду с такими параметрами
     if (s <= h) {
       impossible = true;
     } else {
-      d = sqrt(max(0.0, s * s - h * h));
+      // Для конуса радиус растёт пропорционально высоте
+      // r(y) = rMax * (y / H), где y - текущая высота
+      // Каждый сегмент имеет горизонтальную проекцию d_i
+      // d_i^2 = s^2 - h^2, но для конуса d растёт
+      // Упрощаем: используем средний радиус для оценки
+      rMax = sqrt(max(0.0, s * s - h * h)) * diagonals / 4;
     }
 
-    // visualize corner as center-top and zigzag left-right around center
+    // Настройка визуализации
     final double padding = size.width * 0.08;
     final Offset topCenter = Offset(size.width / 2, padding);
-    final double maxVisualWidth = size.width - padding * 2; // pixels
+    final double maxVisualWidth = size.width - padding * 2;
     final double maxVisualHeight = size.height - padding * 2;
 
-    // determine scale: meters -> pixels
-    final double widthInMeters = 2 * d; // total width in meters
+    // Масштаб: метры -> пиксели
+    final double widthInMeters = 2 * rMax;
     double scaleX = widthInMeters > 0 ? maxVisualWidth / (widthInMeters * 1.2) : maxVisualWidth / 1.0;
-    double scaleY = H > 0 ? maxVisualHeight / (H * 1.05) : maxVisualHeight / 1.0;
+    double scaleY = H > 0 ? maxVisualHeight / (H * 1.1) : maxVisualHeight / 1.0;
     final double scale = min(scaleX, scaleY);
 
-    // draw walls (stylized)
-    final wallLen = maxVisualHeight;
-    canvas.drawLine(Offset(size.width / 2, padding), Offset(size.width / 2, padding + wallLen), paintWall);
+    // Рисуем контур конуса (треугольник)
+    final double rMaxPx = rMax * scale;
+    final Offset bottomLeft = Offset(topCenter.dx - rMaxPx, topCenter.dy + H * scale);
+    final Offset bottomRight = Offset(topCenter.dx + rMaxPx, topCenter.dy + H * scale);
+    final Path conePath = Path();
+    conePath.moveTo(topCenter.dx, topCenter.dy);
+    conePath.lineTo(bottomLeft.dx, bottomLeft.dy);
+    conePath.lineTo(bottomRight.dx, bottomRight.dy);
+    conePath.close();
+    canvas.drawPath(conePath, paintCone);
 
-    // if impossible, draw warning text
+    // Если параметры несовместимы
     if (impossible) {
       paintText.text = TextSpan(
-        text:
-            'Параметры несовместимы: длина сегмента s ≤ h (недостаточно гирлянды для заданной высоты/числа зигзагов).',
+        text: 'Параметры несовместимы: длина сегмента s ≤ h',
         style: TextStyle(color: Colors.red.shade700, fontSize: 12),
       );
       paintText.layout(maxWidth: size.width - 20);
@@ -191,67 +210,74 @@ class CornerTreePainter extends CustomPainter {
       return;
     }
 
-    // build points
+    // Строим точки зигзага с постепенным расширением
     final List<Offset> points = [];
-    Offset current = topCenter;
     double accumulatedY = 0.0;
     bool toLeft = true;
+
     for (int i = 0; i < diagonals; i++) {
       accumulatedY += h;
-      final double xOffsetMeters = (toLeft ? -d : d);
+      // Радиус на текущей высоте (линейное расширение)
+      final double currentRadius = rMax * (accumulatedY / H);
+
+      // Горизонтальное смещение для текущего уровня
+      final double xOffsetMeters = (toLeft ? -currentRadius : currentRadius);
       final Offset next = Offset(topCenter.dx + xOffsetMeters * scale, topCenter.dy + accumulatedY * scale);
       points.add(next);
       toLeft = !toLeft;
     }
 
-    // Draw attachment points and labels
+    // Рисуем точки крепления
     for (final p in points) {
       canvas.drawCircle(p, 4, paintPoint);
     }
 
-    // Draw the garland zigzag polyline: start at topCenter
-    final Path path = Path();
-    path.moveTo(topCenter.dx, topCenter.dy);
+    // Рисуем гирлянду (зигзаг от вершины)
+    final Path garlandPath = Path();
+    garlandPath.moveTo(topCenter.dx, topCenter.dy);
     for (final p in points) {
-      path.lineTo(p.dx, p.dy);
+      garlandPath.lineTo(p.dx, p.dy);
     }
-    canvas.drawPath(path, paintLine);
+    canvas.drawPath(garlandPath, paintLine);
 
-    // Draw a faint guideline from center to bottom corners representing width
-    final double halfWpx = d * scale;
-    final Offset bottomLeft = Offset(topCenter.dx - halfWpx, topCenter.dy + H * scale);
-    final Offset bottomRight = Offset(topCenter.dx + halfWpx, topCenter.dy + H * scale);
-    final guidePaint = Paint()
-      ..color = Colors.blueGrey.withAlpha(64)
+    // Рисуем горизонтальные линии уровней (для наглядности)
+    final levelPaint = Paint()
+      ..color = Colors.blueGrey.withAlpha(40)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
-    canvas.drawLine(bottomLeft, bottomRight, guidePaint);
 
-    // Draw summary text (s, h, W, angle)
-    final double w = 2 * d;
-    final double angleDeg = atan(h / d) * 180 / pi;
+    accumulatedY = 0.0;
+    for (int i = 0; i < diagonals; i++) {
+      accumulatedY += h;
+      final double currentRadius = rMax * (accumulatedY / H);
+      final double y = topCenter.dy + accumulatedY * scale;
+      final double rPx = currentRadius * scale;
+      canvas.drawLine(Offset(topCenter.dx - rPx, y), Offset(topCenter.dx + rPx, y), levelPaint);
+    }
+
+    // Выводим сводную информацию
+    final double baseWidth = 2 * rMax;
+    final double coneAngle = atan(rMax / H) * 180 / pi;
     final summary =
-        'L=${L.toStringAsFixed(2)}m  H=${H.toStringAsFixed(2)}m  N=$N\n  s=${s.toStringAsFixed(3)}m  h=${h.toStringAsFixed(3)}m  W≈${w.toStringAsFixed(3)}m  α≈${angleDeg.toStringAsFixed(1)}°';
+        'L=${L.toStringAsFixed(2)}м  H=${H.toStringAsFixed(2)}м  N=$N\n'
+        'Основание конуса: ${baseWidth.toStringAsFixed(2)}м  '
+        'Угол: ${coneAngle.toStringAsFixed(1)}°';
     paintText.text = TextSpan(
       text: summary,
-      style: TextStyle(color: Colors.black87, fontSize: 12),
+      style: TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.w500),
     );
     paintText.layout(maxWidth: size.width - 20);
     paintText.paint(canvas, Offset(10, 6));
 
-    // Draw small tick marks at left/right attachments per level to help mark positions
+    // Рисуем маленькие метки на центральной оси
     final tickPaint = Paint()
-      ..color = Colors.black26
+      ..color = Colors.black38
       ..strokeWidth = 1;
-    toLeft = true;
     accumulatedY = 0.0;
     for (int i = 0; i < diagonals; i++) {
       accumulatedY += h;
-      final double xOffsetMeters = (toLeft ? -d : d);
-      final Offset p = Offset(topCenter.dx + xOffsetMeters * scale, topCenter.dy + accumulatedY * scale);
-      // small tick on the wall (projected)
-      canvas.drawLine(Offset(topCenter.dx - 6, p.dy), Offset(topCenter.dx + 6, p.dy), tickPaint);
-      toLeft = !toLeft;
+      final double y = topCenter.dy + accumulatedY * scale;
+      canvas.drawLine(Offset(topCenter.dx - 5, y), Offset(topCenter.dx + 5, y), tickPaint);
     }
   }
 
