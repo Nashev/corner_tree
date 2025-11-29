@@ -279,15 +279,20 @@ class CornerTreePainter extends CustomPainter {
     final double rMax = baseWidth / 2;
 
     final double padding = size.width * 0.05;
+    final double topPadding = size.height * 0.05;
     final double bottomPadding = size.height * 0.15;
-    final Offset topCenter = Offset(size.width / 2, padding);
     final double maxVisualWidth = size.width - padding * 2;
-    final double maxVisualHeight = size.height - padding - bottomPadding;
+    final double maxVisualHeight = size.height - topPadding - bottomPadding;
 
     final double widthInMeters = baseWidth;
     double scaleX = widthInMeters > 0 ? maxVisualWidth / (widthInMeters * 1.2) : maxVisualWidth / 1.0;
     double scaleY = H > 0 ? maxVisualHeight / (H * 1.1) : maxVisualHeight / 1.0;
     final double scale = min(scaleX, scaleY);
+
+    // Align to bottom: calculate top position based on actual tree height
+    final double treeHeightPx = H * scale;
+    final double topCenterY = size.height - bottomPadding - treeHeightPx;
+    final Offset topCenter = Offset(size.width / 2, topCenterY);
 
     // Draw cone outline
     final double rMaxPx = rMax * scale;
