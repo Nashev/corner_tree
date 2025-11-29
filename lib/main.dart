@@ -48,6 +48,7 @@ class CornerTreePageState extends State<CornerTreePage> {
   double _baseWidth = 1.2;
   int _hooks = 15;
   bool _mirrorTree = false;
+  double _heightVariation = 0.0; // 0.0 = uniform, 1.0 = max variation
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +84,7 @@ class CornerTreePageState extends State<CornerTreePage> {
                     baseWidth: _baseWidth,
                     hooks: _hooks,
                     mirrorTree: _mirrorTree,
+                    heightVariation: _heightVariation,
                     locale: context.locale,
                   ),
                 ),
@@ -121,6 +123,18 @@ class CornerTreePageState extends State<CornerTreePage> {
                     label: '$_hooks',
                     onChanged: (v) => setState(() => _hooks = v.round()),
                   ),
+                  _buildNumberRow(
+                    context.locale.languageCode == 'ru' ? 'Вариация высоты' : 'Height variation',
+                    '${(_heightVariation * 100).round()}%',
+                  ),
+                  Slider(
+                    min: 0,
+                    max: 100,
+                    divisions: 100,
+                    value: _heightVariation * 100,
+                    label: '${(_heightVariation * 100).round()}%',
+                    onChanged: (v) => setState(() => _heightVariation = v / 100),
+                  ),
                 ],
               ),
             ),
@@ -145,22 +159,26 @@ class CornerTreePageState extends State<CornerTreePage> {
     final int segments = _hooks - 1;
     if (segments < 1) return const SizedBox.shrink();
 
-    final double h = _height / segments;
     final double rMax = _baseWidth / 2;
 
+    // Calculate total garland length with variable segment heights
     double totalGarlandLength = 0.0;
+    double accumulatedHeight = 0.0;
+
     for (int i = 0; i < segments; i++) {
-      final double y1 = i * h;
-      final double y2 = (i + 1) * h;
-      final double r1 = rMax * (y1 / _height);
-      final double r2 = rMax * (y2 / _height);
+      final double t1 = accumulatedHeight / _height;
+      final double segmentHeight = _getSegmentHeight(i, segments);
+      accumulatedHeight += segmentHeight;
+      final double t2 = accumulatedHeight / _height;
+
+      final double r1 = rMax * t1;
+      final double r2 = rMax * t2;
       final double horizontalDist = i == 0 ? r2 : (r1 + r2);
-      final double segmentLength = sqrt(horizontalDist * horizontalDist + h * h);
+      final double segmentLength = sqrt(horizontalDist * horizontalDist + segmentHeight * segmentHeight);
       totalGarlandLength += segmentLength;
     }
 
     final double coneAngle = atan(rMax / _height) * 180 / pi;
-    final int hCm = (h * 100).round();
     final int totalLengthCm = (totalGarlandLength * 100).round();
 
     return Container(
@@ -174,7 +192,7 @@ class CornerTreePageState extends State<CornerTreePage> {
         text: TextSpan(
           style: const TextStyle(fontSize: 13, color: Colors.black87),
           children: [
-            TextSpan(text: '${tr('segments')}: $segments (${tr('per')} $hCm ${tr('cm')}) • '),
+            TextSpan(text: '${tr('segments')}: $segments • '),
             TextSpan(
               text: '${tr('garlandLength')}: $totalLengthCm ${tr('cm')}',
               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -184,6 +202,17 @@ class CornerTreePageState extends State<CornerTreePage> {
         ),
       ),
     );
+  }
+
+  double _getSegmentHeight(int segmentIndex, int totalSegments) {
+    if (_heightVariation == 0.0) {
+      return _height / totalSegments;
+    }
+
+    // Linear interpolation: top segments smaller, bottom segments larger
+    final double t = segmentIndex / (totalSegments - 1);
+    final double factor = 1.0 - _heightVariation + 2.0 * _heightVariation * t;
+    return (_height / totalSegments) * factor;
   }
 }
 
@@ -216,6 +245,7 @@ class CornerTreePainter extends CustomPainter {
   final double baseWidth;
   final int hooks;
   final bool mirrorTree;
+  final double heightVariation;
   final Locale locale;
 
   CornerTreePainter({
@@ -223,6 +253,7 @@ class CornerTreePainter extends CustomPainter {
     required this.baseWidth,
     required this.hooks,
     required this.mirrorTree,
+    required this.heightVariation,
     required this.locale,
   });
 
@@ -245,7 +276,6 @@ class CornerTreePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     final int segments = hooks - 1;
-    final double h = H / segments;
     final double rMax = baseWidth / 2;
 
     final double padding = size.width * 0.05;
@@ -270,13 +300,17 @@ class CornerTreePainter extends CustomPainter {
     conePath.close();
     canvas.drawPath(conePath, paintCone);
 
-    // Build hook points
+    // Build hook points with variable segment heights
     final List<Offset> points = [topCenter];
+    final List<double> segmentHeights = [];
     double accumulatedY = 0.0;
     bool toLeft = mirrorTree ? false : true;
 
     for (int i = 0; i < segments; i++) {
-      accumulatedY += h;
+      final double segmentHeight = _getSegmentHeight(i, segments);
+      segmentHeights.add(segmentHeight);
+      accumulatedY += segmentHeight;
+
       final double currentRadius = rMax * (accumulatedY / H);
       final double xOffsetMeters = (toLeft ? -currentRadius : currentRadius);
       final Offset next = Offset(topCenter.dx + xOffsetMeters * scale, topCenter.dy + accumulatedY * scale);
@@ -319,8 +353,11 @@ class CornerTreePainter extends CustomPainter {
 
     accumulatedY = 0.0;
     toLeft = mirrorTree ? false : true;
+
     for (int i = 0; i < segments; i++) {
-      accumulatedY += h;
+      final double segmentHeight = segmentHeights[i];
+      accumulatedY += segmentHeight;
+
       final double currentRadius = rMax * (accumulatedY / H);
       final double y = topCenter.dy + accumulatedY * scale;
       final double rPx = currentRadius * scale;
@@ -341,6 +378,14 @@ class CornerTreePainter extends CustomPainter {
 
       _drawLengthLabel(canvas, labelText, Offset(labelX, labelY), Colors.blueGrey.shade700);
 
+      // Draw segment height on the right side
+      final int heightCm = (segmentHeight * 100).round();
+      final double prevY = i == 0 ? topCenter.dy : (topCenter.dy + (accumulatedY - segmentHeight) * scale);
+      final double midY = (prevY + y) / 2;
+      final double rightX = topCenter.dx + rMaxPx + 30;
+
+      _drawHeightLabel(canvas, '$heightCm', Offset(rightX, midY), Colors.orange.shade700);
+
       toLeft = !toLeft;
     }
 
@@ -352,10 +397,21 @@ class CornerTreePainter extends CustomPainter {
     for (int i = 0; i <= segments; i++) {
       final double y = topCenter.dy + accumulatedY * scale;
       canvas.drawLine(Offset(topCenter.dx - 5, y), Offset(topCenter.dx + 5, y), tickPaint);
-      if (i < segments) accumulatedY += h;
+      if (i < segments) accumulatedY += segmentHeights[i];
     }
 
     _drawScaleCube(canvas, size, scale, cmUnit);
+  }
+
+  double _getSegmentHeight(int segmentIndex, int totalSegments) {
+    if (heightVariation == 0.0) {
+      return H / totalSegments;
+    }
+
+    // Linear interpolation: top segments smaller, bottom segments larger
+    final double t = segmentIndex / (totalSegments - 1);
+    final double factor = 1.0 - heightVariation + 2.0 * heightVariation * t;
+    return (H / totalSegments) * factor;
   }
 
   void _drawScaleCube(Canvas canvas, Size size, double scale, String cmUnit) {
@@ -438,9 +494,27 @@ class CornerTreePainter extends CustomPainter {
         text: text,
         style: TextStyle(
           color: color,
-          fontSize: 13,
+          fontSize: 10,
           fontWeight: FontWeight.w600,
           backgroundColor: Colors.white.withAlpha(220),
+        ),
+      ),
+      textDirection: ui.TextDirection.ltr,
+    );
+
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(position.dx - textPainter.width / 2, position.dy - textPainter.height / 2));
+  }
+
+  void _drawHeightLabel(Canvas canvas, String text, Offset position, Color color) {
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          backgroundColor: Colors.white.withAlpha(200),
         ),
       ),
       textDirection: ui.TextDirection.ltr,
@@ -456,6 +530,7 @@ class CornerTreePainter extends CustomPainter {
         oldDelegate.baseWidth != baseWidth ||
         oldDelegate.hooks != hooks ||
         oldDelegate.mirrorTree != mirrorTree ||
+        oldDelegate.heightVariation != heightVariation ||
         oldDelegate.locale != locale;
   }
 }
