@@ -1,0 +1,14 @@
+{
+  "appTitle": "Cone Christmas Tree with Garland",
+  "segments": "Segments",
+  "per": "per",
+  "garlandLength": "Garland length",
+  "angle": "Angle",
+  "coneHeight": "Cone height (cm)",
+  "baseWidth": "Base width (cm)",
+  "hooksCount": "Number of hooks",
+  "mirrorTooltip": "Mirror reflection",
+  "fromCorner": "from corner if tree in corner",
+  "cm": "cm"
+}
+

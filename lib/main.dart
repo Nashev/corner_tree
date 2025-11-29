@@ -1,8 +1,23 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-void main() => runApp(CornerTreeApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await EasyLocalization.ensureInitialized();
+
+  runApp(
+    EasyLocalization(
+      supportedLocales: const [Locale('en'), Locale('ru')],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('ru'),
+      child: const CornerTreeApp(),
+    ),
+  );
+}
 
 class CornerTreeApp extends StatelessWidget {
   const CornerTreeApp({super.key});
@@ -10,9 +25,12 @@ class CornerTreeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Конусная ёлка с гирляндой',
+      title: tr('appTitle'),
+      localizationsDelegates: context.localizationDelegates,
+      supportedLocales: context.supportedLocales,
+      locale: context.locale,
       theme: ThemeData.light(),
-      home: CornerTreePage(),
+      home: const CornerTreePage(),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -35,17 +53,18 @@ class CornerTreePageState extends State<CornerTreePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Конусная ёлка с гирляндой'),
+        title: Text(tr('appTitle')),
         actions: [
           IconButton(
             icon: Icon(_mirrorTree ? Icons.flip : Icons.flip_outlined),
-            tooltip: 'Зеркальное отражение',
+            tooltip: tr('mirrorTooltip'),
             onPressed: () {
               setState(() {
                 _mirrorTree = !_mirrorTree;
               });
             },
           ),
+          if (kIsWeb) const _LocaleSwitcher(),
         ],
       ),
       body: SafeArea(
@@ -60,7 +79,13 @@ class CornerTreePageState extends State<CornerTreePage> {
                   border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
                 ),
                 child: CustomPaint(
-                  painter: CornerTreePainter(H: _height, baseWidth: _baseWidth, hooks: _hooks, mirrorTree: _mirrorTree),
+                  painter: CornerTreePainter(
+                    H: _height,
+                    baseWidth: _baseWidth,
+                    hooks: _hooks,
+                    mirrorTree: _mirrorTree,
+                    locale: context.locale,
+                  ),
                 ),
               ),
             ),
@@ -75,31 +100,31 @@ class CornerTreePageState extends State<CornerTreePage> {
                   const SizedBox(height: 10),
 
                   // Controls
-                  _buildNumberRow('Высота конуса (см)', (_height * 100).round().toString()),
+                  _buildNumberRow(tr('coneHeight'), (_height * 100).round().toString()),
                   Slider(
-                    min: 10,
-                    max: 500,
-                    divisions: 490,
+                    min: 30,
+                    max: 300,
+                    divisions: 270,
                     value: _height * 100,
-                    label: '${(_height * 100).round()} см',
+                    label: '${(_height * 100).round()} ${tr('cm')}',
                     onChanged: (v) => setState(() => _height = v / 100),
                   ),
 
-                  _buildNumberRow('Ширина основания (см)', (_baseWidth * 100).round().toString()),
+                  _buildNumberRow(tr('baseWidth'), (_baseWidth * 100).round().toString()),
                   Slider(
-                    min: 10,
+                    min: 20,
                     max: 300,
-                    divisions: 290,
+                    divisions: 280,
                     value: _baseWidth * 100,
-                    label: '${(_baseWidth * 100).round()} см',
+                    label: '${(_baseWidth * 100).round()} ${tr('cm')}',
                     onChanged: (v) => setState(() => _baseWidth = v / 100),
                   ),
 
-                  _buildNumberRow('Число крючков', '$_hooks'),
+                  _buildNumberRow(tr('hooksCount'), '$_hooks'),
                   Slider(
                     min: 2,
-                    max: 70,
-                    divisions: 68,
+                    max: 40,
+                    divisions: 38,
                     value: _hooks.toDouble(),
                     label: '$_hooks',
                     onChanged: (v) => setState(() => _hooks = v.round()),
@@ -159,14 +184,38 @@ class CornerTreePageState extends State<CornerTreePage> {
         text: TextSpan(
           style: const TextStyle(fontSize: 13, color: Colors.black87),
           children: [
-            TextSpan(text: 'Сегментов: $segments (по $hCm см высотой) • '),
+            TextSpan(text: '${tr('segments')}: $segments (${tr('per')} $hCm ${tr('cm')}) • '),
             TextSpan(
-              text: 'Длина гирлянды: $totalLengthCm см',
+              text: '${tr('garlandLength')}: $totalLengthCm ${tr('cm')}',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            TextSpan(text: ' • Угол: ${coneAngle.toStringAsFixed(1)}°'),
+            TextSpan(text: ' • ${tr('angle')}: ${coneAngle.toStringAsFixed(1)}°'),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LocaleSwitcher extends StatelessWidget {
+  const _LocaleSwitcher();
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<Locale>(
+        value: context.locale,
+        icon: const Icon(Icons.language),
+        dropdownColor: Theme.of(context).colorScheme.surface,
+        onChanged: (locale) {
+          if (locale != null) {
+            context.setLocale(locale);
+          }
+        },
+        items: const [
+          DropdownMenuItem(value: Locale('en'), child: Text('EN')),
+          DropdownMenuItem(value: Locale('ru'), child: Text('RU')),
+        ],
       ),
     );
   }
@@ -177,8 +226,15 @@ class CornerTreePainter extends CustomPainter {
   final double baseWidth; // meters (ширина основания конуса)
   final int hooks; // количество крючков (включая верхний)
   final bool mirrorTree; // зеркальное отражение
+  final Locale locale; // локаль для подписей
 
-  CornerTreePainter({required this.H, required this.baseWidth, required this.hooks, required this.mirrorTree});
+  CornerTreePainter({
+    required this.H,
+    required this.baseWidth,
+    required this.hooks,
+    required this.mirrorTree,
+    required this.locale,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -274,6 +330,9 @@ class CornerTreePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 
+    final cmUnit = tr('cm');
+    final fromCornerText = tr('fromCorner');
+
     accumulatedY = 0.0;
     toLeft = mirrorTree ? false : true; // Сбрасываем направление
     for (int i = 0; i < segments; i++) {
@@ -297,8 +356,8 @@ class CornerTreePainter extends CustomPainter {
       // Формируем текст подписи
       final bool isLastSegment = (i == segments - 1);
       final String labelText = isLastSegment
-          ? '$aCm см ($cornerDistCm см от угла, если ёлка в углу)'
-          : '$aCm см ($cornerDistCm см)';
+          ? '$aCm $cmUnit ($cornerDistCm $fromCornerText)'
+          : '$aCm $cmUnit ($cornerDistCm)';
 
       // Позиция подписи - посередине между центром и крючком
       final double labelX = (topCenter.dx + hookPoint.dx) / 2;
@@ -321,10 +380,10 @@ class CornerTreePainter extends CustomPainter {
     }
 
     // Рисуем кубик 10см для масштаба (аксонометрическая проекция)
-    _drawScaleCube(canvas, size, scale);
+    _drawScaleCube(canvas, size, scale, cmUnit);
   }
 
-  void _drawScaleCube(Canvas canvas, Size size, double scale) {
+  void _drawScaleCube(Canvas canvas, Size size, double scale, String cmUnit) {
     // Кубик 10см = 0.1м
     final double cubeSize = 0.1; // метры
     final double cubeSizePx = cubeSize * scale; // пиксели
@@ -401,10 +460,10 @@ class CornerTreePainter extends CustomPainter {
     // Подпись "10 см"
     final textPainter = TextPainter(
       text: TextSpan(
-        text: '10 см',
+        text: '10 $cmUnit',
         style: TextStyle(color: Colors.orange.shade900, fontSize: 11, fontWeight: FontWeight.bold),
       ),
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
     );
     textPainter.layout();
     textPainter.paint(canvas, Offset(cubeX - 10, cubeY - 20));
@@ -421,8 +480,9 @@ class CornerTreePainter extends CustomPainter {
           backgroundColor: Colors.white.withAlpha(220),
         ),
       ),
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
     );
+
     textPainter.layout();
     textPainter.paint(canvas, Offset(position.dx - textPainter.width / 2, position.dy - textPainter.height / 2));
   }
@@ -432,6 +492,7 @@ class CornerTreePainter extends CustomPainter {
     return oldDelegate.H != H ||
         oldDelegate.baseWidth != baseWidth ||
         oldDelegate.hooks != hooks ||
-        oldDelegate.mirrorTree != mirrorTree;
+        oldDelegate.mirrorTree != mirrorTree ||
+        oldDelegate.locale != locale;
   }
 }
