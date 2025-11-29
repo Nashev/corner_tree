@@ -44,10 +44,10 @@ class CornerTreePage extends StatefulWidget {
 }
 
 class CornerTreePageState extends State<CornerTreePage> {
-  double _height = 1.5; // meters (высота конуса)
-  double _baseWidth = 1.2; // meters (ширина основания конуса)
-  int _hooks = 15; // количество крючков (включая верхний)
-  bool _mirrorTree = false; // зеркальное отражение
+  double _height = 1.5;
+  double _baseWidth = 1.2;
+  int _hooks = 15;
+  bool _mirrorTree = false;
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +70,6 @@ class CornerTreePageState extends State<CornerTreePage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Область визуализации на всю ширину
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -89,17 +88,12 @@ class CornerTreePageState extends State<CornerTreePage> {
                 ),
               ),
             ),
-
-            // Компактное описание и слайдеры
             Padding(
               padding: const EdgeInsets.all(10.0),
               child: Column(
                 children: [
-                  // Компактная информация в одну строку
                   _buildInfoPanel(),
                   const SizedBox(height: 10),
-
-                  // Controls
                   _buildNumberRow(tr('coneHeight'), (_height * 100).round().toString()),
                   Slider(
                     min: 30,
@@ -109,7 +103,6 @@ class CornerTreePageState extends State<CornerTreePage> {
                     label: '${(_height * 100).round()} ${tr('cm')}',
                     onChanged: (v) => setState(() => _height = v / 100),
                   ),
-
                   _buildNumberRow(tr('baseWidth'), (_baseWidth * 100).round().toString()),
                   Slider(
                     min: 20,
@@ -119,7 +112,6 @@ class CornerTreePageState extends State<CornerTreePage> {
                     label: '${(_baseWidth * 100).round()} ${tr('cm')}',
                     onChanged: (v) => setState(() => _baseWidth = v / 100),
                   ),
-
                   _buildNumberRow(tr('hooksCount'), '$_hooks'),
                   Slider(
                     min: 2,
@@ -150,14 +142,12 @@ class CornerTreePageState extends State<CornerTreePage> {
   );
 
   Widget _buildInfoPanel() {
-    // Расчёты для отображения информации
     final int segments = _hooks - 1;
     if (segments < 1) return const SizedBox.shrink();
 
     final double h = _height / segments;
     final double rMax = _baseWidth / 2;
 
-    // Рассчитываем длину гирлянды
     double totalGarlandLength = 0.0;
     for (int i = 0; i < segments; i++) {
       final double y1 = i * h;
@@ -222,11 +212,11 @@ class _LocaleSwitcher extends StatelessWidget {
 }
 
 class CornerTreePainter extends CustomPainter {
-  final double H; // meters (высота конуса)
-  final double baseWidth; // meters (ширина основания конуса)
-  final int hooks; // количество крючков (включая верхний)
-  final bool mirrorTree; // зеркальное отражение
-  final Locale locale; // локаль для подписей
+  final double H;
+  final double baseWidth;
+  final int hooks;
+  final bool mirrorTree;
+  final Locale locale;
 
   CornerTreePainter({
     required this.H,
@@ -254,26 +244,22 @@ class CornerTreePainter extends CustomPainter {
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
-    // Конусная геометрия: вершина вверху, расширение книзу
-    final int segments = hooks - 1; // сегментов на 1 меньше, чем крючков
+    final int segments = hooks - 1;
+    final double h = H / segments;
+    final double rMax = baseWidth / 2;
 
-    final double h = H / segments; // вертикальный шаг на один сегмент (м)
-    final double rMax = baseWidth / 2; // радиус = половина ширины
-
-    // Настройка визуализации
     final double padding = size.width * 0.05;
-    final double bottomPadding = size.height * 0.15; // Больше места снизу для кубика
+    final double bottomPadding = size.height * 0.15;
     final Offset topCenter = Offset(size.width / 2, padding);
     final double maxVisualWidth = size.width - padding * 2;
     final double maxVisualHeight = size.height - padding - bottomPadding;
 
-    // Масштаб: метры -> пиксели
     final double widthInMeters = baseWidth;
     double scaleX = widthInMeters > 0 ? maxVisualWidth / (widthInMeters * 1.2) : maxVisualWidth / 1.0;
     double scaleY = H > 0 ? maxVisualHeight / (H * 1.1) : maxVisualHeight / 1.0;
     final double scale = min(scaleX, scaleY);
 
-    // Рисуем контур конуса (треугольник)
+    // Draw cone outline
     final double rMaxPx = rMax * scale;
     final Offset bottomLeft = Offset(topCenter.dx - rMaxPx, topCenter.dy + H * scale);
     final Offset bottomRight = Offset(topCenter.dx + rMaxPx, topCenter.dy + H * scale);
@@ -284,10 +270,10 @@ class CornerTreePainter extends CustomPainter {
     conePath.close();
     canvas.drawPath(conePath, paintCone);
 
-    // Строим крючки (hooks) с постепенным расширением
-    final List<Offset> points = [topCenter]; // начинаем с вершины
+    // Build hook points
+    final List<Offset> points = [topCenter];
     double accumulatedY = 0.0;
-    bool toLeft = mirrorTree ? false : true; // Начальное направление зависит от зеркалирования
+    bool toLeft = mirrorTree ? false : true;
 
     for (int i = 0; i < segments; i++) {
       accumulatedY += h;
@@ -298,12 +284,12 @@ class CornerTreePainter extends CustomPainter {
       toLeft = !toLeft;
     }
 
-    // Рисуем крючки (hooks)
+    // Draw hooks
     for (final p in points) {
       canvas.drawCircle(p, 4, paintPoint);
     }
 
-    // Рисуем гирлянду (зигзаг от вершины)
+    // Draw garland zigzag
     final Path garlandPath = Path();
     garlandPath.moveTo(points[0].dx, points[0].dy);
     for (int i = 1; i < points.length; i++) {
@@ -311,12 +297,10 @@ class CornerTreePainter extends CustomPainter {
     }
     canvas.drawPath(garlandPath, paintLine);
 
-    // Рисуем провод, свисающий с нижнего крючка
+    // Draw hanging wire from bottom hook
     final Offset lastHook = points[points.length - 1];
-    final double wireLength = 80; // пиксели
-    final double wireEndX = lastHook.dx < topCenter.dx
-        ? 0 // уходит влево за экран
-        : size.width; // уходит вправо за экран
+    final double wireLength = 80;
+    final double wireEndX = lastHook.dx < topCenter.dx ? 0 : size.width;
     final double wireEndY = lastHook.dy + wireLength;
 
     final Path wirePath = Path();
@@ -324,7 +308,7 @@ class CornerTreePainter extends CustomPainter {
     wirePath.quadraticBezierTo(lastHook.dx, wireEndY, wireEndX, wireEndY);
     canvas.drawPath(wirePath, paintWire);
 
-    // Рисуем горизонтальные линии уровней с подписями длин
+    // Draw horizontal level lines with labels
     final levelPaint = Paint()
       ..color = Colors.blueGrey.withAlpha(40)
       ..style = PaintingStyle.stroke
@@ -334,32 +318,24 @@ class CornerTreePainter extends CustomPainter {
     final fromCornerText = tr('fromCorner');
 
     accumulatedY = 0.0;
-    toLeft = mirrorTree ? false : true; // Сбрасываем направление
+    toLeft = mirrorTree ? false : true;
     for (int i = 0; i < segments; i++) {
       accumulatedY += h;
       final double currentRadius = rMax * (accumulatedY / H);
       final double y = topCenter.dy + accumulatedY * scale;
       final double rPx = currentRadius * scale;
 
-      // Рисуем горизонтальную линию
       canvas.drawLine(Offset(topCenter.dx - rPx, y), Offset(topCenter.dx + rPx, y), levelPaint);
 
-      // Определяем позицию крючка на этом уровне
-      final Offset hookPoint = points[i + 1]; // +1 потому что points[0] - вершина
-
-      // Переводим расстояние в сантиметры
+      final Offset hookPoint = points[i + 1];
       final int aCm = (currentRadius * 100).round();
-
-      // Вычисляем расстояние от угла: sqrt((2*a)^2/2) = sqrt(2*a^2) = a*sqrt(2)
       final int cornerDistCm = (currentRadius * sqrt(2) * 100).round();
 
-      // Формируем текст подписи
       final bool isLastSegment = (i == segments - 1);
       final String labelText = isLastSegment
           ? '$aCm $cmUnit ($cornerDistCm $fromCornerText)'
           : '$aCm $cmUnit ($cornerDistCm)';
 
-      // Позиция подписи - посередине между центром и крючком
       final double labelX = (topCenter.dx + hookPoint.dx) / 2;
       final double labelY = y + 14;
 
@@ -368,7 +344,7 @@ class CornerTreePainter extends CustomPainter {
       toLeft = !toLeft;
     }
 
-    // Рисуем маленькие метки на центральной оси
+    // Draw axis tick marks
     final tickPaint = Paint()
       ..color = Colors.black38
       ..strokeWidth = 1;
@@ -379,21 +355,16 @@ class CornerTreePainter extends CustomPainter {
       if (i < segments) accumulatedY += h;
     }
 
-    // Рисуем кубик 10см для масштаба (аксонометрическая проекция)
     _drawScaleCube(canvas, size, scale, cmUnit);
   }
 
   void _drawScaleCube(Canvas canvas, Size size, double scale, String cmUnit) {
-    // Кубик 10см = 0.1м
-    final double cubeSize = 0.1; // метры
-    final double cubeSizePx = cubeSize * scale; // пиксели
+    final double cubeSize = 0.1;
+    final double cubeSizePx = cubeSize * scale;
 
-    // Размещаем кубик справа снизу
     final double cubeX = size.width - 80;
     final double cubeY = size.height - 80;
 
-    // Аксонометрическая проекция (изометрия)
-    // Углы: 30° для X и Z осей
     final double angle = 30 * pi / 180;
     final double xOffset = cubeSizePx * cos(angle);
     final double yOffset = cubeSizePx * sin(angle);
@@ -406,22 +377,15 @@ class CornerTreePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
-    // Определяем 8 вершин куба в изометрии
-    // Нижняя грань (левая)
-    final p0 = Offset(cubeX, cubeY); // центр куба
-    final p1 = p0 + Offset(0, 2 * yOffset); // вниз, нижняя правая
-    final p2 = p0 + Offset(-xOffset, yOffset); // влево, нижняя левая
-    final p3 = p0 + Offset(-xOffset, -yOffset); // верхняя левая
+    final p0 = Offset(cubeX, cubeY);
+    final p1 = p0 + Offset(0, 2 * yOffset);
+    final p2 = p0 + Offset(-xOffset, yOffset);
+    final p3 = p0 + Offset(-xOffset, -yOffset);
+    final p4 = p0 + Offset(0, -2 * yOffset);
+    final p5 = p0 + Offset(xOffset, -yOffset);
+    final p6 = p0 + Offset(xOffset, yOffset);
 
-    // Верхняя грань
-    final p4 = p0 + Offset(0, -2 * yOffset); // верхняя
-    final p5 = p0 + Offset(xOffset, -yOffset); // правая
-    // Нижняя правая грань
-    final p6 = p0 + Offset(xOffset, yOffset); //  правая нижняя
-
-    // Рисуем три видимые грани
-
-    // Передняя грань (светлая)
+    // Front face
     final frontPath = Path();
     frontPath.moveTo(p0.dx, p0.dy);
     frontPath.lineTo(p1.dx, p1.dy);
@@ -431,7 +395,7 @@ class CornerTreePainter extends CustomPainter {
     canvas.drawPath(frontPath, cubePaint);
     canvas.drawPath(frontPath, cubeEdgePaint);
 
-    // Правая грань (темнее)
+    // Right face
     final rightPaint = Paint()
       ..color = Colors.orange.shade400
       ..style = PaintingStyle.fill;
@@ -444,7 +408,7 @@ class CornerTreePainter extends CustomPainter {
     canvas.drawPath(rightPath, rightPaint);
     canvas.drawPath(rightPath, cubeEdgePaint);
 
-    // Верхняя грань (самая светлая)
+    // Top face
     final topPaint = Paint()
       ..color = Colors.orange.shade200
       ..style = PaintingStyle.fill;
@@ -457,7 +421,6 @@ class CornerTreePainter extends CustomPainter {
     canvas.drawPath(topPath, topPaint);
     canvas.drawPath(topPath, cubeEdgePaint);
 
-    // Подпись "10 см"
     final textPainter = TextPainter(
       text: TextSpan(
         text: '10 $cmUnit',
