@@ -75,24 +75,24 @@ class CornerTreePageState extends State<CornerTreePage> {
                   const SizedBox(height: 10),
 
                   // Controls
-                  _buildNumberRow('Высота конуса (м)', _height.toStringAsFixed(2)),
+                  _buildNumberRow('Высота конуса (см)', (_height * 100).round().toString()),
                   Slider(
-                    min: 0.3,
-                    max: 3.0,
+                    min: 30,
+                    max: 300,
                     divisions: 270,
-                    value: _height,
-                    label: '${_height.toStringAsFixed(2)} м',
-                    onChanged: (v) => setState(() => _height = double.parse(v.toStringAsFixed(2))),
+                    value: _height * 100,
+                    label: '${(_height * 100).round()} см',
+                    onChanged: (v) => setState(() => _height = v / 100),
                   ),
 
-                  _buildNumberRow('Ширина основания (м)', _baseWidth.toStringAsFixed(2)),
+                  _buildNumberRow('Ширина основания (см)', (_baseWidth * 100).round().toString()),
                   Slider(
-                    min: 0.2,
-                    max: 3.0,
+                    min: 20,
+                    max: 300,
                     divisions: 280,
-                    value: _baseWidth,
-                    label: '${_baseWidth.toStringAsFixed(2)} м',
-                    onChanged: (v) => setState(() => _baseWidth = double.parse(v.toStringAsFixed(2))),
+                    value: _baseWidth * 100,
+                    label: '${(_baseWidth * 100).round()} см',
+                    onChanged: (v) => setState(() => _baseWidth = v / 100),
                   ),
 
                   _buildNumberRow('Число крючков', '$_hooks'),
@@ -162,6 +162,8 @@ class CornerTreePageState extends State<CornerTreePage> {
     }
 
     final double coneAngle = atan(rMax / _height) * 180 / pi;
+    final int hCm = (h * 100).round();
+    final int totalLengthCm = (totalGarlandLength * 100).round();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -171,8 +173,8 @@ class CornerTreePageState extends State<CornerTreePage> {
         border: Border.all(color: Colors.blue.shade200),
       ),
       child: Text(
-        'Сегментов: $segments (по ${h.toStringAsFixed(3)}м) • '
-        'Длина гирлянды: ${totalGarlandLength.toStringAsFixed(2)}м • '
+        'Сегментов: $segments (по $hCm см) • '
+        'Длина гирлянды: $totalLengthCm см • '
         'Угол: ${coneAngle.toStringAsFixed(1)}°',
         style: const TextStyle(fontSize: 13),
       ),
@@ -290,17 +292,23 @@ class CornerTreePainter extends CustomPainter {
       // Определяем позицию крючка на этом уровне
       final Offset hookPoint = points[i + 1]; // +1 потому что points[0] - вершина
 
-      // Подписываем расстояние от центра до крючка (радиус)
+      // Переводим расстояние в сантиметры
+      final int aCm = (currentRadius * 100).round();
+
+      // Вычисляем расстояние от угла: sqrt((2*a)^2/2) = sqrt(2*a^2) = a*sqrt(2)
+      final int cornerDistCm = (currentRadius * sqrt(2) * 100).round();
+
+      // Формируем текст подписи
+      final bool isLastSegment = (i == segments - 1);
+      final String labelText = isLastSegment
+          ? '$aCm ($cornerDistCm от угла, если ёлка в углу)'
+          : '$aCm ($cornerDistCm)';
+
       // Позиция подписи - посередине между центром и крючком
       final double labelX = (topCenter.dx + hookPoint.dx) / 2;
       final double labelY = y + 14;
 
-      _drawLengthLabel(
-        canvas,
-        '${currentRadius.toStringAsFixed(2)}м',
-        Offset(labelX, labelY),
-        Colors.blueGrey.shade700,
-      );
+      _drawLengthLabel(canvas, labelText, Offset(labelX, labelY), Colors.blueGrey.shade700);
 
       toLeft = !toLeft;
     }
@@ -414,7 +422,7 @@ class CornerTreePainter extends CustomPainter {
         text: text,
         style: TextStyle(
           color: color,
-          fontSize: 10,
+          fontSize: 9,
           fontWeight: FontWeight.w600,
           backgroundColor: Colors.white.withAlpha(220),
         ),
