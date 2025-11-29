@@ -29,11 +29,25 @@ class CornerTreePageState extends State<CornerTreePage> {
   double _height = 1.5; // meters (высота конуса)
   double _baseWidth = 1.2; // meters (ширина основания конуса)
   int _hooks = 15; // количество крючков (включая верхний)
+  bool _mirrorTree = false; // зеркальное отражение
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Конусная ёлка с гирляндой')),
+      appBar: AppBar(
+        title: const Text('Конусная ёлка с гирляндой'),
+        actions: [
+          IconButton(
+            icon: Icon(_mirrorTree ? Icons.flip : Icons.flip_outlined),
+            tooltip: 'Зеркальное отражение',
+            onPressed: () {
+              setState(() {
+                _mirrorTree = !_mirrorTree;
+              });
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -46,7 +60,7 @@ class CornerTreePageState extends State<CornerTreePage> {
                   border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
                 ),
                 child: CustomPaint(
-                  painter: CornerTreePainter(H: _height, baseWidth: _baseWidth, hooks: _hooks),
+                  painter: CornerTreePainter(H: _height, baseWidth: _baseWidth, hooks: _hooks, mirrorTree: _mirrorTree),
                 ),
               ),
             ),
@@ -100,6 +114,7 @@ class CornerTreePageState extends State<CornerTreePage> {
                             _height = 1.5;
                             _baseWidth = 1.2;
                             _hooks = 15;
+                            _mirrorTree = false;
                           });
                         },
                         child: const Text('Сбросить'),
@@ -169,8 +184,9 @@ class CornerTreePainter extends CustomPainter {
   final double H; // meters (высота конуса)
   final double baseWidth; // meters (ширина основания конуса)
   final int hooks; // количество крючков (включая верхний)
+  final bool mirrorTree; // зеркальное отражение
 
-  CornerTreePainter({required this.H, required this.baseWidth, required this.hooks});
+  CornerTreePainter({required this.H, required this.baseWidth, required this.hooks, required this.mirrorTree});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -230,7 +246,7 @@ class CornerTreePainter extends CustomPainter {
     // Строим крючки (hooks) с постепенным расширением
     final List<Offset> points = [topCenter]; // начинаем с вершины
     double accumulatedY = 0.0;
-    bool toLeft = true;
+    bool toLeft = mirrorTree ? false : true; // Начальное направление зависит от зеркалирования
 
     for (int i = 0; i < segments; i++) {
       accumulatedY += h;
@@ -261,7 +277,7 @@ class CornerTreePainter extends CustomPainter {
       ..strokeWidth = 1;
 
     accumulatedY = 0.0;
-    toLeft = true; // Отслеживаем направление для правильного размещения подписи
+    toLeft = mirrorTree ? false : true; // Сбрасываем направление
     for (int i = 0; i < segments; i++) {
       accumulatedY += h;
       final double currentRadius = rMax * (accumulatedY / H);
@@ -411,6 +427,9 @@ class CornerTreePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CornerTreePainter oldDelegate) {
-    return oldDelegate.H != H || oldDelegate.baseWidth != baseWidth || oldDelegate.hooks != hooks;
+    return oldDelegate.H != H ||
+        oldDelegate.baseWidth != baseWidth ||
+        oldDelegate.hooks != hooks ||
+        oldDelegate.mirrorTree != mirrorTree;
   }
 }
