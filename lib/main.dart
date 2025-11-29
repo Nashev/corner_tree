@@ -28,12 +28,12 @@ class CornerTreePage extends StatefulWidget {
 class CornerTreePageState extends State<CornerTreePage> {
   double _length = 5.5; // meters
   double _height = 1.5; // meters
-  int _zigzags = 7;
+  int _hooks = 14; // количество крючков
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Схема крепления гирлянды (угловая)')),
+      appBar: AppBar(title: const Text('Конусная ёлка с гирляндой')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(10.0),
@@ -53,7 +53,7 @@ class CornerTreePageState extends State<CornerTreePage> {
                           border: Border.all(color: Colors.grey.shade300),
                         ),
                         child: CustomPaint(
-                          painter: CornerTreePainter(L: _length, H: _height, N: _zigzags),
+                          painter: CornerTreePainter(L: _length, H: _height, hooks: _hooks),
                         ),
                       );
                     },
@@ -83,28 +83,28 @@ class CornerTreePageState extends State<CornerTreePage> {
                 onChanged: (v) => setState(() => _height = double.parse(v.toStringAsFixed(2))),
               ),
 
-              _buildNumberRow('Число зигзагов N', '$_zigzags'),
+              _buildNumberRow('Число крючков (hooks)', '$_hooks'),
               Slider(
-                min: 1,
-                max: 20,
-                divisions: 19,
-                value: _zigzags.toDouble(),
-                label: '$_zigzags',
-                onChanged: (v) => setState(() => _zigzags = v.round()),
+                min: 2,
+                max: 40,
+                divisions: 38,
+                value: _hooks.toDouble(),
+                label: '$_hooks',
+                onChanged: (v) => setState(() => _hooks = v.round()),
               ),
 
               const SizedBox(height: 6),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Советы: проверь, чтобы s ≥ h; если s < h — параметры несовместимы.'),
+                  Text('Конус расширяется от вершины книзу'),
                   TextButton(
                     onPressed: () {
                       setState(() {
                         // quick example preset
                         _length = 5.5;
                         _height = 1.5;
-                        _zigzags = 7;
+                        _hooks = 14;
                       });
                     },
                     child: const Text('Сбросить в пример'),
@@ -131,11 +131,11 @@ class CornerTreePageState extends State<CornerTreePage> {
 }
 
 class CornerTreePainter extends CustomPainter {
-  final double L; // meters
-  final double H; // meters
-  final int N; // zigzags
+  final double L; // meters (длина гирлянды)
+  final double H; // meters (высота конуса)
+  final int hooks; // количество крючков
 
-  CornerTreePainter({required this.L, required this.H, required this.N});
+  CornerTreePainter({required this.L, required this.H, required this.hooks});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -153,9 +153,10 @@ class CornerTreePainter extends CustomPainter {
     final paintText = TextPainter(textDirection: TextDirection.ltr);
 
     // Конусная геометрия: вершина вверху, расширение книзу
-    final int diagonals = 2 * N; // количество диагональных сегментов
-    final double h = H / diagonals; // вертикальный шаг на один сегмент (м)
-    final double s = L / diagonals; // длина одного сегмента гирлянды (м)
+    // hooks - общее количество крючков (не считая вершину)
+    final int segments = hooks; // количество сегментов гирлянды
+    final double h = H / segments; // вертикальный шаг на один сегмент (м)
+    final double s = L / segments; // длина одного сегмента гирлянды (м)
 
     // Радиус конуса в основании (максимальный)
     // Используем формулу: если общая длина L распределена по конусу,
@@ -173,7 +174,7 @@ class CornerTreePainter extends CustomPainter {
       // Каждый сегмент имеет горизонтальную проекцию d_i
       // d_i^2 = s^2 - h^2, но для конуса d растёт
       // Упрощаем: используем средний радиус для оценки
-      rMax = sqrt(max(0.0, s * s - h * h)) * diagonals / 4;
+      rMax = sqrt(max(0.0, s * s - h * h)) * segments / 4;
     }
 
     // Настройка визуализации
@@ -210,12 +211,12 @@ class CornerTreePainter extends CustomPainter {
       return;
     }
 
-    // Строим точки зигзага с постепенным расширением
+    // Строим крючки (hooks) с постепенным расширением
     final List<Offset> points = [];
     double accumulatedY = 0.0;
     bool toLeft = true;
 
-    for (int i = 0; i < diagonals; i++) {
+    for (int i = 0; i < segments; i++) {
       accumulatedY += h;
       // Радиус на текущей высоте (линейное расширение)
       final double currentRadius = rMax * (accumulatedY / H);
@@ -227,7 +228,7 @@ class CornerTreePainter extends CustomPainter {
       toLeft = !toLeft;
     }
 
-    // Рисуем точки крепления
+    // Рисуем крючки (hooks)
     for (final p in points) {
       canvas.drawCircle(p, 4, paintPoint);
     }
@@ -247,7 +248,7 @@ class CornerTreePainter extends CustomPainter {
       ..strokeWidth = 1;
 
     accumulatedY = 0.0;
-    for (int i = 0; i < diagonals; i++) {
+    for (int i = 0; i < segments; i++) {
       accumulatedY += h;
       final double currentRadius = rMax * (accumulatedY / H);
       final double y = topCenter.dy + accumulatedY * scale;
@@ -259,7 +260,7 @@ class CornerTreePainter extends CustomPainter {
     final double baseWidth = 2 * rMax;
     final double coneAngle = atan(rMax / H) * 180 / pi;
     final summary =
-        'L=${L.toStringAsFixed(2)}м  H=${H.toStringAsFixed(2)}м  N=$N\n'
+        'L=${L.toStringAsFixed(2)}м  H=${H.toStringAsFixed(2)}м  Hooks: $hooks\n'
         'Основание конуса: ${baseWidth.toStringAsFixed(2)}м  '
         'Угол: ${coneAngle.toStringAsFixed(1)}°';
     paintText.text = TextSpan(
@@ -274,7 +275,7 @@ class CornerTreePainter extends CustomPainter {
       ..color = Colors.black38
       ..strokeWidth = 1;
     accumulatedY = 0.0;
-    for (int i = 0; i < diagonals; i++) {
+    for (int i = 0; i < segments; i++) {
       accumulatedY += h;
       final double y = topCenter.dy + accumulatedY * scale;
       canvas.drawLine(Offset(topCenter.dx - 5, y), Offset(topCenter.dx + 5, y), tickPaint);
@@ -283,6 +284,6 @@ class CornerTreePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CornerTreePainter oldDelegate) {
-    return oldDelegate.L != L || oldDelegate.H != H || oldDelegate.N != N;
+    return oldDelegate.L != L || oldDelegate.H != H || oldDelegate.hooks != hooks;
   }
 }
