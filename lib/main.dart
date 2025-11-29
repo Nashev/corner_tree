@@ -4,6 +4,8 @@ import 'dart:ui' as ui;
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:web/web.dart' as web;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,6 +57,20 @@ class CornerTreePageState extends State<CornerTreePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(tr('appTitle')),
+        leading: IconButton(
+          icon: const Icon(Icons.home),
+          tooltip: 'Home',
+          onPressed: () async {
+            if (kIsWeb) {
+              web.window.location.href = 'https://innenashev.narod.ru/';
+            } else {
+              final Uri url = Uri.parse('https://innenashev.narod.ru/');
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              }
+            }
+          },
+        ),
         actions: [
           IconButton(
             icon: Icon(_mirrorTree ? Icons.flip : Icons.flip_outlined),
