@@ -1,16 +1,39 @@
-# corner_tree
+# Corner Tree App
 
-Calculate you corner cristmas tree
+Calculate garland length for a cone-shaped Christmas tree.
+
+![Screenshot](Tree.png)
+
+## 🌐 Web Version
+
+[Try it online](https://innenashev.narod.ru/CornerTreeApp/index.html)
+
+## Features
+
+- Adjustable cone height and base width
+- Configurable number of hooks
+- Automatic garland length calculation
+- Mirror reflection mode
+- English/Russian localization
+- Visual representation with measurements
+- Scale reference cube (10 cm)
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+### Build for Web
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+flutter build web
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Technologies
+
+- Flutter
+- easy_localization
+- Custom Canvas painting
+
